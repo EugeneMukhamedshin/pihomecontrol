@@ -58,7 +58,7 @@ function logInfo(msg) {
 }
 
 function logError(msg, err) {
-    log.error(err);
+    log.error(msg, err);
 }
 
 // config
