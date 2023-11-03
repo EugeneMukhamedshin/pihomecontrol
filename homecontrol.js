@@ -122,7 +122,7 @@ function emitValues(socket) {
 }
 
 function writeConfig() {
-    fs.writeFile(__dirname + "/config.txt", `${servoValue.toString()};${autoTempValue.toString()};${lowerDelta.toString()};${upperDelta.toString()};${autoTempSourceIndex.toString()}`);
+    fs.writeFileSync(__dirname + "/config.txt", `${servoValue.toString()};${autoTempValue.toString()};${lowerDelta.toString()};${upperDelta.toString()};${autoTempSourceIndex.toString()}`);
 }
 
 var connectionsCount = 0;
@@ -210,7 +210,7 @@ function logValues() {
     const now = new Date();
     const datestr = dateFormat(now, "yyyymmdd");
     const timestr = dateFormat(now, "dd.mm.yyyy HH:MM:ss");
-    fs.appendFile(`data/${datestr}.csv`,
+    fs.appendFileSync(`data/${datestr}.csv`,
         `${timestr};${autoTempStr};${lowerDeltaStr};${upperDeltaStr};${heaterActivated};${contactorValue};${tempSensor1Value};${tempSensor2Value};${tempSensor3Value};${tempSensor4Value};${tempSensor5Value};${autoTempSourceIndex};\r\n`);
 }
 
