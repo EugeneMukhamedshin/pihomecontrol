@@ -1,4 +1,8 @@
-FROM arm32v7/node:20-alpine
+FROM ubuntu
+
+RUN apt-get update
+RUN apt-get install node pigpio
+
 # Create app directory
 WORKDIR /usr/app
 
@@ -6,9 +10,6 @@ WORKDIR /usr/app
 # A wildcard is used to ensure both package.json AND package-lock.json are copied
 # where available (npm@5+)
 COPY package*.json ./
-
-RUN apt-get install pigpio
-RUN npm install
 
 # If you are building your code for production
 # RUN npm ci --only=production
