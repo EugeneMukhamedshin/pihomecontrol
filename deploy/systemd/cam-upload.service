@@ -1,0 +1,20 @@
+[Unit]
+Description=pihomecontrol: заливка сегментов камеры в Яндекс Диск (rclone)
+Documentation=file://__APP_DIR__/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__APP_USER__
+ExecStart=/usr/bin/env bash __APP_DIR__/tools/cam-upload.sh
+Restart=always
+RestartSec=30
+# Заливка упирается в канал, а не в CPU: приоритет ниже, чем у отопления.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStopSec=25
+
+[Install]
+WantedBy=multi-user.target

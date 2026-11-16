@@ -1,0 +1,20 @@
+[Unit]
+Description=pihomecontrol: запись с камеры Tapo C320WS (ffmpeg)
+Documentation=file://__APP_DIR__/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__APP_USER__
+ExecStart=/usr/bin/env bash __APP_DIR__/tools/cam-recorder.sh
+Restart=always
+RestartSec=15
+# Запись не должна конкурировать с управлением котлом за CPU и диск.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStopSec=25
+
+[Install]
+WantedBy=multi-user.target

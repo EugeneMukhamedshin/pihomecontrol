@@ -135,3 +135,6 @@ state.json
 config.txt.tmp
 auth.json
 auth.json.tmp
+
+# Настройки камеры: в них пароль от RTSP
+config/camera.env
