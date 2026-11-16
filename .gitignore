@@ -138,3 +138,6 @@ auth.json.tmp
 
 # Настройки камеры: в них пароль от RTSP
 config/camera.env
+
+# Настройки сервиса: порт и пароль для входа
+config/pihomecontrol.env
