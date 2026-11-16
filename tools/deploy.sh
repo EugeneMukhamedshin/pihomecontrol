@@ -50,20 +50,44 @@ if [[ -f $ENV_FILE ]]; then
     fi
 fi
 
+CONFIG_BACKUP=""
+restore_config() {
+    if [[ -n $CONFIG_BACKUP && -f $CONFIG_BACKUP ]]; then
+        mv -f "$CONFIG_BACKUP" "$BASE_DIR/config.txt"
+        CONFIG_BACKUP=""
+    fi
+    return 0
+}
+trap restore_config EXIT
+
 if (( DO_PULL )); then
     if [[ ! -d $BASE_DIR/.git ]]; then
         printf 'Это не git-копия (%s/.git не найден). Используйте --no-pull.\n' "$BASE_DIR" >&2
         exit 1
     fi
 
-    # config.txt приложение меняет во время работы, devices.json правят на Pi.
-    # --autostash позволяет обновляться, не теряя эти изменения.
+    # config.txt — runtime-файл: приложение меняет его во время работы.
+    # Убираем его с пути git pull (и, если он ещё отслеживается, откатываем
+    # локальную правку), чтобы обновление не удалило уставки. После pull
+    # возвращаем файл на место.
+    if [[ -f $BASE_DIR/config.txt ]]; then
+        CONFIG_BACKUP=$(mktemp)
+        cp "$BASE_DIR/config.txt" "$CONFIG_BACKUP"
+        if git ls-files --error-unmatch config.txt >/dev/null 2>&1; then
+            git checkout -- config.txt
+        else
+            rm -f "$BASE_DIR/config.txt"
+        fi
+    fi
+
+    # devices.json тоже правят на Pi, для него достаточно --autostash.
     if [[ -n $(git status --porcelain --untracked-files=no) ]]; then
         printf 'Есть локальные изменения — делаю git pull --autostash.\n'
         git pull --ff-only --autostash
     else
         git pull --ff-only
     fi
+    restore_config()
     printf 'Версия: %s\n' "$(git log -1 --oneline)"
 fi
 

@@ -54,7 +54,8 @@
 - удалён `heater.js` — он при запуске **включал** котёл и падал на неопределённой
   переменной `contactor`;
 - `package.json`: `main`/`start`/`dev` теперь указывают на `homecontrol.js`;
-- `.gitignore`: `data/`, `state.json`, `config.txt.tmp`.
+- `.gitignore`: `data/`, `state.json`, `config.txt` (локальные уставки), `auth.json`,
+  логи (`*.log`, `*.log.*`), `config/*.env`.
 
 ### Как это работает
 

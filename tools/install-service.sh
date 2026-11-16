@@ -96,6 +96,13 @@ if [[ ! -f $ENV_DST ]]; then
     printf 'Создан %s (права 600).\n' "$ENV_DST"
 fi
 
+# config.txt больше не хранится в git: на новом клоне его нет.
+if [[ ! -f $BASE_DIR/config.txt && -f $BASE_DIR/config.example.txt ]]; then
+    cp "$BASE_DIR/config.example.txt" "$BASE_DIR/config.txt"
+    chown "$APP_USER" "$BASE_DIR/config.txt"
+    printf 'Создан config.txt из config.example.txt.\n'
+fi
+
 # Приложению нужно писать config.txt, state.json, auth.json, data/ и лог.
 if ! sudo -u "$APP_USER" test -w "$BASE_DIR"; then
     printf 'Каталог %s недоступен на запись пользователю «%s».\n' "$BASE_DIR" "$APP_USER" >&2
