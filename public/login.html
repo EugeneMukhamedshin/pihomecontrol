@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
+    <title>Вход — Отопление</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+    <style>
+        :root {
+            --bg: #f4f6fb;
+            --card: #ffffff;
+            --text: #101828;
+            --muted: #667085;
+            --line: #e4e7ec;
+            --accent: #2563eb;
+            --accent-weak: #eef4ff;
+            --danger: #f04438;
+            --danger-weak: #fef0ef;
+            --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 8px 24px rgba(16, 24, 40, .06);
+            --radius: 18px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0b1220;
+                --card: #111a2c;
+                --text: #e6edf7;
+                --muted: #94a3b8;
+                --line: #22304a;
+                --accent: #60a5fa;
+                --accent-weak: #14233d;
+                --danger: #f87171;
+                --danger-weak: #2a1517;
+                --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
+                --radius: 18px;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.45;
+            -webkit-font-smoothing: antialiased;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+        }
+
+        .card {
+            width: 100%;
+            max-width: 420px;
+            padding: 26px 22px;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -.02em;
+        }
+
+        .sub {
+            margin: 6px 0 22px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 15px;
+            border: 1.5px solid var(--line);
+            border-radius: 13px;
+            background: var(--accent-weak);
+            color: var(--text);
+            font: inherit;
+            font-size: 18px;
+            letter-spacing: .04em;
+        }
+
+        input[type="password"]:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-weak);
+        }
+
+        button {
+            width: 100%;
+            min-height: 52px;
+            margin-top: 16px;
+            padding: 0 18px;
+            border: 0;
+            border-radius: 13px;
+            background: var(--accent);
+            color: #fff;
+            font: inherit;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            touch-action: manipulation;
+            transition: transform .06s, filter .15s;
+        }
+
+        button:active {
+            transform: scale(.98);
+            filter: brightness(.95);
+        }
+
+        .error {
+            margin: 0 0 16px;
+            padding: 10px 12px;
+            border-radius: 11px;
+            background: var(--danger-weak);
+            color: var(--danger);
+            font-size: 13.5px;
+        }
+
+        .error:empty {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="card">
+            <h1>Отопление</h1>
+            <p class="sub">Введите пароль, чтобы управлять отоплением.</p>
+            <p class="error" id="loginError" role="alert">{{ERROR}}</p>
+            <form method="POST" action="/login">
+                <label for="password">Пароль</label>
+                <input id="password" name="password" type="password" autocomplete="current-password"
+                       autocapitalize="off" autocorrect="off" spellcheck="false" required autofocus>
+                <button type="submit">Войти</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>

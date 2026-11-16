@@ -129,6 +129,33 @@
             background: var(--danger);
         }
 
+        .topbar-side {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
+
+        .logout-form {
+            margin: 0;
+        }
+
+        .logout {
+            padding: 2px 4px;
+            border: 0;
+            background: none;
+            color: var(--muted);
+            font: inherit;
+            font-size: 12.5px;
+            text-decoration: underline;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .logout:active {
+            color: var(--text);
+        }
+
         /* Карточки */
 
         .card {
@@ -458,9 +485,14 @@
                 <h1>Отопление</h1>
                 <div class="sub" id="updated">загрузка…</div>
             </div>
-            <div class="conn" id="conn" aria-live="polite">
-                <span class="dot"></span>
-                <span id="connText">связь…</span>
+            <div class="topbar-side">
+                <div class="conn" id="conn" aria-live="polite">
+                    <span class="dot"></span>
+                    <span id="connText">связь…</span>
+                </div>
+                <form method="POST" action="/logout" class="logout-form">
+                    <button type="submit" class="logout">Выйти</button>
+                </form>
             </div>
         </header>
 
@@ -505,6 +537,17 @@
             "use strict";
 
             var socket = io();
+
+            // Сессия могла истечь или cookie удалили: сервер не пустит сокет,
+            // поэтому возвращаемся на страницу входа.
+            function redirectIfUnauthorized(reason) {
+                if (reason && reason.code === "E_UNAUTHORIZED") {
+                    window.location.href = "/login";
+                }
+            }
+
+            socket.on("error", redirectIfUnauthorized);
+            socket.on("connect_error", redirectIfUnauthorized);
 
             // Нагревом можно управлять только по комнатным датчикам:
             // улица, кессон и труба для этого не годятся.

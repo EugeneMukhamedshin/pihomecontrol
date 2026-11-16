@@ -19,6 +19,7 @@ const os = require("os"); // адреса для доступа с телефо�
 var io = require("socket.io")(http); //require socket.io module and pass the http object (server)
 const hardware = require("./lib/hardware");
 const { SwitchGroup } = require("./lib/switches");
+const { createAuth } = require("./lib/auth");
 var Gpio = hardware.pigpio.Gpio;
 var dateFormat = require("dateformat");
 
@@ -83,6 +84,13 @@ function logError(msg, err) {
     // log4js плохо печатает сам объект Error — передаём стек строкой
     log.error(msg, err && err.stack ? err.stack : err);
 }
+
+// Аутентификация: один пароль, HttpOnly-cookie с HMAC-подписью.
+// Без внешних зависимостей; пароль и секрет — в auth.json (в git не попадает).
+const auth = createAuth({
+    file: __dirname + "/auth.json",
+    log: log
+});
 
 // config
 fs.readFile(__dirname + "/config.txt", "utf8", function (err, contents) {
@@ -171,16 +179,213 @@ http.on("error", function (err) {
     logError(`HTTP server error on port ${httpPort}`, err);
 });
 
-function handler(req, res) { //what to do on requests to port 8080
-    logInfo("Got request, sending response");
-    fs.readFile(__dirname + "/public/homecontrol.html", function (err, data) { //read file rgb.html in public folder
-        if (err) {
-            res.writeHead(404, { 'Content-Type': "text/html" }); //display 404 on error
-            return res.end("404 Not Found");
-        }
-        res.writeHead(200, { 'Content-Type': "text/html" }); //write HTML
-        res.write(data); //write data from rgb.html
+// --- HTTP: страница входа, интерфейс, выход ------------------------------
+
+const PUBLIC_DIR = __dirname + "/public";
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function requestIp(req) {
+    return (req.socket && req.socket.remoteAddress) || "unknown";
+}
+
+function redirect(res, location) {
+    res.writeHead(302, {
+        Location: location,
+        "Cache-Control": "no-store",
+        "X-Frame-Options": "DENY"
+    });
+    res.end();
+}
+
+function methodNotAllowed(res, allow) {
+    res.writeHead(405, {
+        Allow: allow,
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store"
+    });
+    res.end("405 Method Not Allowed");
+}
+
+async function sendPage(req, res, filename) {
+    let data;
+    try {
+        data = await fs.promises.readFile(`${PUBLIC_DIR}/${filename}`);
+    } catch (err) {
+        logError(`Не удалось прочитать public/${filename}`, err);
+        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+        return res.end("404 Not Found");
+    }
+    res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "no-referrer"
+    });
+    if (req.method === "HEAD") {
         return res.end();
+    }
+    res.end(data);
+}
+
+async function sendLoginPage(req, res, status, error, extraHeaders) {
+    let html;
+    try {
+        html = await fs.promises.readFile(`${PUBLIC_DIR}/login.html`, "utf8");
+    } catch (err) {
+        logError("Не удалось прочитать public/login.html", err);
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+        return res.end("500 Internal Server Error");
+    }
+    html = html.replace("{{ERROR}}", escapeHtml(error || ""));
+    res.writeHead(status, Object.assign({
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "no-referrer"
+    }, extraHeaders || {}));
+    if (req.method === "HEAD") {
+        return res.end();
+    }
+    res.end(html);
+}
+
+function readRequestBody(req, limit) {
+    return new Promise((resolve, reject) => {
+        let size = 0;
+        let failed = false;
+        const chunks = [];
+        req.on("data", (chunk) => {
+            if (failed) {
+                return;
+            }
+            size += chunk.length;
+            if (size > limit) {
+                failed = true;
+                chunks.length = 0;
+                // Тело формы не должно быть большим: дальше читать незачем.
+                req.destroy();
+                return;
+            }
+            chunks.push(chunk);
+        });
+        req.on("end", () => {
+            if (failed) {
+                reject(new Error("E_TOO_LARGE"));
+                return;
+            }
+            resolve(Buffer.concat(chunks).toString("utf8"));
+        });
+        req.on("error", reject);
+    });
+}
+
+async function handleLogin(req, res) {
+    const ip = requestIp(req);
+    if (auth.isRateLimited(ip)) {
+        const retryAfter = auth.retryAfterSec(ip);
+        return sendLoginPage(req, res, 429,
+            `Слишком много неудачных попыток. Повторите через ${retryAfter} с.`,
+            { "Retry-After": String(retryAfter) });
+    }
+
+    let body;
+    try {
+        body = await readRequestBody(req, 4096);
+    } catch (err) {
+        return sendLoginPage(req, res, 413, "Слишком большой запрос.");
+    }
+
+    let password = "";
+    try {
+        password = new URLSearchParams(body).get("password") || "";
+    } catch (err) {
+        password = "";
+    }
+
+    if (!auth.verifyPassword(password)) {
+        auth.registerFailure(ip);
+        return sendLoginPage(req, res, 401, "Неверный пароль.");
+    }
+
+    auth.resetFailures(ip);
+    logInfo(`Вход в интерфейс выполнен с ${ip}`);
+    res.writeHead(303, {
+        Location: "/",
+        "Set-Cookie": auth.loginCookie(),
+        "Cache-Control": "no-store",
+        "X-Frame-Options": "DENY"
+    });
+    res.end();
+}
+
+async function handleRequest(req, res) {
+    const method = req.method || "GET";
+    const pathname = new URL(req.url || "/", "http://localhost").pathname;
+
+    if (pathname === "/login") {
+        if (method === "GET" || method === "HEAD") {
+            if (auth.isAuthenticated(req)) {
+                return redirect(res, "/");
+            }
+            return sendLoginPage(req, res, 200, "");
+        }
+        if (method === "POST") {
+            return handleLogin(req, res);
+        }
+        return methodNotAllowed(res, "GET, HEAD, POST");
+    }
+
+    if (pathname === "/logout") {
+        if (method !== "POST") {
+            return methodNotAllowed(res, "POST");
+        }
+        res.writeHead(303, {
+            Location: "/login",
+            "Set-Cookie": auth.logoutCookie(),
+            "Cache-Control": "no-store"
+        });
+        return res.end();
+    }
+
+    if (pathname === "/" || pathname === "/index.html" || pathname === "/homecontrol.html") {
+        if (method !== "GET" && method !== "HEAD") {
+            return methodNotAllowed(res, "GET, HEAD");
+        }
+        if (!auth.isAuthenticated(req)) {
+            return redirect(res, "/login");
+        }
+        return sendPage(req, res, "homecontrol.html");
+    }
+
+    // Остальное — 404. Клиент socket.io (/socket.io/socket.io.js) отдаёт сам
+    // socket.io, до этого обработчика такие запросы не доходят.
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+    res.end("404 Not Found");
+}
+
+function handler(req, res) {
+    handleRequest(req, res).catch(function (err) {
+        logError("Ошибка обработки HTTP-запроса", err);
+        if (res.headersSent) {
+            try {
+                res.end();
+            } catch (ignored) {
+                // соединение уже закрыто
+            }
+            return;
+        }
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+        res.end("500 Internal Server Error");
     });
 }
 
@@ -210,6 +415,42 @@ function writeConfig() {
 }
 
 var connectionsCount = 0;
+
+// socket.io по умолчанию принимает соединения с любого сайта, поэтому
+// проверяем не только cookie входа, но и origin: страница должна быть
+// открыта с этого же адреса. Запросы без Origin (smoke-test, curl) пропускаем —
+// без cookie они всё равно не пройдут проверку входа.
+function isSameOrigin(request) {
+    const origin = request.headers.origin;
+    if (!origin) {
+        return true;
+    }
+    try {
+        return new URL(origin).host === request.headers.host;
+    } catch (err) {
+        return false;
+    }
+}
+
+io.use(function (socket, next) {
+    const request = socket.request;
+
+    if (!isSameOrigin(request)) {
+        logError(`Отклонено подключение к сокету с чужого origin: ${request.headers.origin} (${socket.handshake.address})`);
+        const err = new Error("forbidden origin");
+        err.data = { code: "E_ORIGIN", message: "Запрос с чужого сайта отклонён" };
+        return next(err);
+    }
+
+    if (!auth.isAuthenticated(request)) {
+        logInfo(`Отклонено подключение к сокету без входа (${socket.handshake.address})`);
+        const err = new Error("unauthorized");
+        err.data = { code: "E_UNAUTHORIZED", message: "Требуется вход" };
+        return next(err);
+    }
+
+    next();
+});
 
 // sockets
 io.sockets.on("connection", function (socket) {
