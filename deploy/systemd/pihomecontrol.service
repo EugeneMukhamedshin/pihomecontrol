@@ -1,8 +1,11 @@
 [Unit]
 Description=pihomecontrol: отопление, насос и бойлер (GPIO)
 Documentation=file://__APP_DIR__/README.md
-After=network-online.target pigpiod.service
-Wants=network-online.target pigpiod.service
+After=network-online.target
+Wants=network-online.target
+# pigpiod НЕ нужен и мешает: модуль pigpio инициализирует GPIO внутри процесса
+# и падает с «pigpio error -1», если демон уже держит /var/run/pigpio.pid.
+# Поэтому в зависимостях его нет, а на Pi он должен быть остановлен.
 
 [Service]
 Type=simple

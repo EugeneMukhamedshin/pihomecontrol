@@ -8,6 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon homecontrol.js",
     "relay-test": "node tools/relay-test.js",
+    "gpio-doctor": "node tools/gpio-doctor.js",
     "smoke": "node tools/smoke-test.js"
   },
   "author": "",

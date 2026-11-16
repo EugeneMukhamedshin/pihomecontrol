@@ -63,18 +63,17 @@ if (( NODE_MAJOR < 20 )); then
     printf 'Внимание: найден Node.js %s (%s), проект рассчитан на 20+.\n' "$("$NODE_BIN" -v)" "$NODE_BIN" >&2
 fi
 
-# Серво котла работает через демон pigpio.
-if ! systemctl cat pigpiod.service >/dev/null 2>&1; then
-    printf 'Не найден pigpiod.service — без него не запустится управление серво (GPIO22).\n' >&2
-    printf 'Установите и включите:\n' >&2
-    printf '  sudo apt install pigpio\n' >&2
-    printf '  sudo systemctl enable --now pigpiod\n' >&2
-    exit 1
+# pigpiod сервису НЕ нужен и мешает: модуль pigpio инициализирует библиотеку
+# внутри процесса (gpioInitialise) и падает с «pigpio error -1», если демон уже
+# держит /var/run/pigpio.pid. В этом случае сервис уходит в цикл перезапусков
+# и не доходит до управления реле. Поэтому демон останавливаем и маскируем.
+if systemctl is-active --quiet pigpiod.service 2>/dev/null; then
+    printf 'Останавливаю pigpiod: он конфликтует с модулем pigpio внутри сервиса.\n'
+    systemctl disable --now pigpiod.service >/dev/null 2>&1 || true
 fi
-systemctl enable --now pigpiod.service >/dev/null 2>&1 || true
-if ! systemctl is-active --quiet pigpiod.service; then
-    printf 'Внимание: pigpiod не запустился, серво котла может не работать.\n' >&2
-    printf 'Проверьте: sudo systemctl status pigpiod\n' >&2
+if systemctl is-enabled --quiet pigpiod.service 2>/dev/null; then
+    systemctl mask pigpiod.service >/dev/null 2>&1 || true
+    printf 'pigpiod замаскирован (серво, если оно нужно, работает без демона).\n'
 fi
 
 if ! getent group gpio >/dev/null 2>&1; then

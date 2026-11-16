@@ -20,10 +20,12 @@ var io = require("socket.io")(http); //require socket.io module and pass the htt
 const hardware = require("./lib/hardware");
 const { SwitchGroup } = require("./lib/switches");
 const { createAuth } = require("./lib/auth");
-var Gpio = hardware.pigpio.Gpio;
 var dateFormat = require("dateformat");
 
-var servo = new Gpio(22, { mode: Gpio.OUTPUT });
+// Серво мощности котла (GPIO22) — необязательная часть. Если pigpio
+// недоступен (нет библиотеки или запущен демон pigpiod), сервис продолжает
+// работать: реле котла, насоса и бойлера от серво не зависят.
+var servo = null;
 
 var servoValue = 0;
 var currentTemp = NaN;
@@ -85,6 +87,40 @@ function logError(msg, err) {
     log.error(msg, err && err.stack ? err.stack : err);
 }
 
+// Инициализация серво. Ошибка здесь не должна ронять сервис: без серво
+// мощность котла не регулируется, но отопление, насос и бойлер работают.
+function initServo() {
+    if (process.env.SERVO_ENABLED === "0") {
+        logInfo("Серво отключено (SERVO_ENABLED=0)");
+        return;
+    }
+    try {
+        const pigpio = hardware.getPigpio();
+        servo = new pigpio.Gpio(22, { mode: pigpio.Gpio.OUTPUT });
+    } catch (err) {
+        logError("Серво (GPIO22) недоступно — мощность котла не регулируется. " +
+            "Проверьте, что не запущен pigpiod (модуль pigpio инициализирует GPIO сам), " +
+            "или поставьте SERVO_ENABLED=0", err);
+        servo = null;
+    }
+}
+
+function servoWrite(value) {
+    if (!servo) {
+        return false;
+    }
+    try {
+        servo.servoWrite(value);
+        return true;
+    } catch (err) {
+        logError("Ошибка записи серво, отключаю его до перезапуска", err);
+        servo = null;
+        return false;
+    }
+}
+
+initServo();
+
 // Аутентификация: один пароль, HttpOnly-cookie с HMAC-подписью.
 // Без внешних зависимостей; пароль и секрет — в auth.json (в git не попадает).
 const auth = createAuth({
@@ -128,7 +164,7 @@ fs.readFile(__dirname + "/config.txt", "utf8", function (err, contents) {
         autoTempSourceIndex = 0;
     }
 
-    servo.servoWrite(servoValue);
+    servoWrite(servoValue);
     logInfo(`Read from config: ${contents}. Parsed: Servo=${servoValue} AutoTemp=${autoTempValue} lowerDelta=${lowerDelta} upperDelta=${upperDelta}`);
     if (!err) {
         // Нормализуем файл (например, если в нём было только 3 поля).
@@ -391,7 +427,15 @@ function handler(req, res) {
 
 // Отправка данных всем подписанным
 function emitValues(socket) {
-    logInfo(`Emitting Temp=${currentTemp} Servo=${servoValue} AutoTemp=${autoTempValue} Contactor=${contactorValue} Heater=${heaterActivated}`);
+    // Состояние линии выхода котла читаем заново: если пин перехватил другой
+    // драйвер, это будет видно прямо в периодической строке лога.
+    const heaterSwitch = switches ? switches.get("heater") : null;
+    let heaterPinInfo = "";
+    if (heaterSwitch && !heaterSwitch.dryRun) {
+        const pinValue = heaterSwitch.readOutput();
+        heaterPinInfo = ` GPIO${heaterSwitch.pin}=${pinValue === null ? "?" : pinValue}`;
+    }
+    logInfo(`Emitting Temp=${currentTemp} Servo=${servoValue} AutoTemp=${autoTempValue} Contactor=${contactorValue} Heater=${heaterActivated}${heaterPinInfo}`);
     socket.emit("currentTemp", currentTemp);
     socket.emit("servo", servoValue);
     socket.emit("contactor", contactorValue);
@@ -468,7 +512,7 @@ io.sockets.on("connection", function (socket) {
         servoValue = value;
         writeConfig();
         logInfo(`servo: ${servoValue}`); //output converted to console
-        servo.servoWrite(servoValue);
+        servoWrite(servoValue);
     });
 
     // read and set autoTemp value
