@@ -2,10 +2,13 @@
   "name": "notable",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "homecontrol.js",
   "scripts": {
+    "start": "node homecontrol.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon server.js"
+    "dev": "nodemon homecontrol.js",
+    "relay-test": "node tools/relay-test.js",
+    "smoke": "node tools/smoke-test.js"
   },
   "author": "",
   "license": "ISC",

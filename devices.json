@@ -1,0 +1,37 @@
+{
+  "stateFile": "state.json",
+  "dryRun": true,
+  "devices": [
+    {
+      "id": "heater",
+      "title": "Пускатель котла",
+      "pin": 27,
+      "feedbackPin": 17,
+      "activeLow": false,
+      "minOnSec": 0,
+      "minOffSec": 30,
+      "restoreOnStart": false,
+      "dryRun": false
+    },
+    {
+      "id": "pump",
+      "title": "Насос (скважина)",
+      "pin": 23,
+      "activeLow": false,
+      "feedbackPin": null,
+      "minOnSec": 0,
+      "minOffSec": 30,
+      "restoreOnStart": true
+    },
+    {
+      "id": "boiler",
+      "title": "Бойлер",
+      "pin": 24,
+      "activeLow": false,
+      "feedbackPin": null,
+      "minOnSec": 0,
+      "minOffSec": 0,
+      "restoreOnStart": true
+    }
+  ]
+}

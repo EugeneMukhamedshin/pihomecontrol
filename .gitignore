@@ -128,3 +128,8 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Локальные данные и состояние
+data/
+state.json
+config.txt.tmp
